@@ -1,3 +1,5 @@
+Cloned repository from https://github.com/MakeMagazinDE/Fledermaus-Scanner
+
 ![GitHub Logo](http://www.heise.de/make/icons/make_logo.png)
 
 Maker Media GmbH

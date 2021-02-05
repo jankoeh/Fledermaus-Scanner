@@ -102,9 +102,11 @@ class BatData:
     """
     Data processing class
     """
-    verbose = 0
+    verbose = 1
     def __init__(self, uc_if=None):
+        from concurrent.futures import ThreadPoolExecutor
         self.uc_if = uc_if
+        self.save_executer = ThreadPoolExecutor(5) #save data in separate threads
 
     def record_fft_data(self, length_seconds=10):
         """
@@ -136,23 +138,34 @@ class BatData:
         fmin, fmax define the min/max frequency in Hz to consider
         """
         from numpy import array
-        import pickle
         while True:
             timestamps, freq, data = self.record_fft_data(10)
             mask = (freq > fmin)*(freq < fmax)
             maxvalue = array(data).T[mask].max()
             if maxvalue > threshold:
-                filename = timestamps[0].strftime("%Y-%M-%d_%H%m%S")
                 if self.verbose:
-                    print("Found maximum: {}, saving to {}".format(maxvalue, filename))
-                file = open(filename+".pickle", 'wb')
-                pickle.dump([timestamps, freq, data], file)
-                file.close()
-                fig = plot_fft_data((timestamps, freq, data), True)
-                fig.savefig(filename+".png")
+                    print("Found maximum: {}".format(maxvalue))
+                args = ([timestamps, freq, data ], threshold, fmin, fmax)
+                self.save_executer.submit(save_fft_data, *args)
+                #save_fft_data([timestamps, freq, data], threshold, fmin, fmax)
 
 
-def plot_fft_data(fftdata, logcolor=False):
+def save_fft_data(fftdata, threshold, fmin, fmax):
+    """
+    save data as figure and pickle
+    """
+    import pickle
+    timestamps, freq, data = fftdata
+    filename = timestamps[0].strftime("%Y-%m-%d_%H%M%S")
+    file = open(filename+".pickle", 'wb')
+    pickle.dump(fftdata, file)
+    file.close()
+    fig = plot_time_fft_data((timestamps, freq, data), False)
+    fig.savefig(filename+"_time_fft.png")
+    fig = plot_fft_data(fftdata, threshold, fmin, fmax)
+    fig.savefig(filename+"_fft.png")
+
+def plot_time_fft_data(fftdata, logcolor=False):
     """
     Plot 2D Frequqncy data - return Figure
     """
@@ -169,9 +182,29 @@ def plot_fft_data(fftdata, logcolor=False):
     fig.colorbar(mesh, ax=ax1)
     ax1.set_xlabel("Time")
     ax1.set_ylabel("f [kHz]")
-    ax1.set_title(time[0].strftime("%Y-%M-%d %H:%m:%S"))
+    ax1.set_title(time[0].strftime("%Y-%m-%d %H:%M:%S"))
     return fig
 
+def plot_fft_data(fftdata, threshold, fmin=20e3, fmax=500e3):
+    """
+    """
+    timestamps, freq, data = fftdata
+    mask = (freq > fmin)*(freq < fmax)
+    import pylab
+    fig = pylab.figure(figsize=(20, 10))
+    ax1 = fig.subplots()
+    ax1.set_title(timestamps[0].strftime("%Y-%m-%d %H:%M:%S"))
+    ax1.grid()
+    ax1.set_xlabel("f [kHz]")
+    #ax1.set_ylim(bottom=1)
+    ax1.set_yscale('log')
+    for i in range(len(data)):
+        dataset = pylab.array(data[i])[mask]
+        if dataset.max() > threshold:
+            label = timestamps[i].strftime("%H:%M:%S")
+            ax1.plot(freq[mask]/1e3, dataset, label=label)
+    ax1.legend()
+    return fig
 
 if __name__ == "__main__":
     DATAPROC = BatData(BatUcIF("/dev/ttyACM0"))

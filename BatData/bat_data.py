@@ -144,8 +144,8 @@ class BatData:
             maxvalue = array(data).T[mask].max()
             if maxvalue > threshold:
                 if self.verbose:
-                    print("Found maximum: {}".format(maxvalue))
-                args = ([timestamps, freq, data ], threshold, fmin, fmax)
+                    print("{} Found maximum: {}".format(timestamps[0], maxvalue))
+                args = ([timestamps, freq, data], threshold, fmin, fmax)
                 self.save_executer.submit(save_fft_data, *args)
                 #save_fft_data([timestamps, freq, data], threshold, fmin, fmax)
 
@@ -154,6 +154,7 @@ def save_fft_data(fftdata, threshold, fmin, fmax):
     """
     save data as figure and pickle
     """
+    import pylab
     import pickle
     timestamps, freq, data = fftdata
     filename = timestamps[0].strftime("%Y-%m-%d_%H%M%S")
@@ -162,12 +163,14 @@ def save_fft_data(fftdata, threshold, fmin, fmax):
     file.close()
     fig = plot_time_fft_data((timestamps, freq, data), False)
     fig.savefig(filename+"_time_fft.png")
+    pylab.close(fig)
     fig = plot_fft_data(fftdata, threshold, fmin, fmax)
     fig.savefig(filename+"_fft.png")
+    pylab.close(fig)
 
 def plot_time_fft_data(fftdata, logcolor=False):
     """
-    Plot 2D Frequqncy data - return Figure
+    Plot 2D time-frequqncy data - return Figure
     """
     time, freq, data = fftdata
     import pylab
@@ -187,6 +190,7 @@ def plot_time_fft_data(fftdata, logcolor=False):
 
 def plot_fft_data(fftdata, threshold, fmin=20e3, fmax=500e3):
     """
+    plot frequency data sets above threshold
     """
     timestamps, freq, data = fftdata
     mask = (freq > fmin)*(freq < fmax)
@@ -199,13 +203,15 @@ def plot_fft_data(fftdata, threshold, fmin=20e3, fmax=500e3):
     #ax1.set_ylim(bottom=1)
     ax1.set_yscale('log')
     for i in range(len(data)):
-        dataset = pylab.array(data[i])[mask]
-        if dataset.max() > threshold:
+        dataset = pylab.array(data[i])
+        if dataset[mask].max() > threshold:
             label = timestamps[i].strftime("%H:%M:%S")
-            ax1.plot(freq[mask]/1e3, dataset, label=label)
+            ax1.plot(freq/1e3, dataset, label=label)
     ax1.legend()
     return fig
 
 if __name__ == "__main__":
+    import matplotlib
+    matplotlib.use('Agg')
     DATAPROC = BatData(BatUcIF("/dev/ttyACM0"))
     DATAPROC.watch_fft(12)
